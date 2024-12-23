@@ -11,28 +11,20 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include "workload.h"
 
 #ifndef max
     #define max(a,b) ((a) > (b) ? (a) : (b))
 #endif
 
-static int total_sent = 0;
-struct timespec start_time;
-static float rps = 1.0f;  // expected #requests/sec
-
-void sim_request() {
-  struct timespec rqtp = {
-    .tv_sec = 0,
-    .tv_nsec = 1e7  // 10ms
-  };
-  nanosleep(&rqtp, NULL);
-  if (total_sent == 20) {
-    rqtp.tv_sec = 100;
-    rqtp.tv_nsec = 0;
-    nanosleep(&rqtp, NULL);
-  }
-  ++total_sent;
-}
+//void sim_request() {
+//  struct timespec rqtp = {
+//    .tv_sec = 0,
+//    .tv_nsec = 1e7  // 10ms
+//  };
+//  nanosleep(&rqtp, NULL);
+//  ++total_sent;
+//}
 
 struct timespec get_curtime() {
   struct timespec curtime;
@@ -40,16 +32,12 @@ struct timespec get_curtime() {
   return curtime;
 }
 
-long get_expected_cnt() {
+long get_expected_cnt(struct timespec *start_time, float rps) {
   struct timespec curtime = get_curtime();
-  long double elapsed_s = (curtime.tv_sec + curtime.tv_nsec / 1e9) - (start_time.tv_sec + start_time.tv_nsec / 1e9);
+  long double elapsed_s = (curtime.tv_sec + curtime.tv_nsec / 1e9) - (start_time->tv_sec + start_time->tv_nsec / 1e9);
   return max(0, (long)(elapsed_s * rps)-1);
 }
 
-void print_stats() {
-  int expected = get_expected_cnt();
-  printf("total sent: %d, expected: %d\n", total_sent, expected);
-}
 
 void sleep_until(struct timespec* endtime) {
   struct timespec curtime = get_curtime();
@@ -61,36 +49,36 @@ void sleep_until(struct timespec* endtime) {
 }
 
 //return start_time + total_sent * 1/rps;
-struct timespec get_next() {
+struct timespec get_next(struct timespec *start_time, int total_sent, float rps) {
   long double time_spent = total_sent * (1.0l/rps);
   long long num_sec = (long long)time_spent;
   long long num_nsec = (time_spent - num_sec) * 1e9;
   
   return (struct timespec) {
-    .tv_sec=start_time.tv_sec + num_sec,
-    .tv_nsec=start_time.tv_nsec + num_nsec
+    .tv_sec=start_time->tv_sec + num_sec,
+    .tv_nsec=start_time->tv_nsec + num_nsec
   };
 }
 
-void start() {
-  struct timespec next_time;
-  while (1) {
-    while (total_sent < get_expected_cnt()) {
-      printf("behind schedule |   ");
-      print_stats();
-      next_time = get_next();
-      sim_request();
-    }
-    printf("on schedule     |   ");
-    print_stats();
-    next_time = get_next();
-    sleep_until(&next_time);
-    sim_request();
-  }
-}
+// void start() {
+//   struct timespec next_time;
+//   while (1) {
+//     while (total_sent < get_expected_cnt()) {
+//       printf("behind schedule |   ");
+//       print_stats();
+//       next_time = get_next();
+//       sim_request();
+//     }
+//     printf("on schedule     |   ");
+//     print_stats();
+//     next_time = get_next();
+//     sleep_until(&next_time);
+//     sim_request();
+//   }
+// }
 
-int main(int argc, char**argv) {
-  start_time = get_curtime();
-  start();
-  return 0;
-}
+// int main(int argc, char**argv) {
+//   start_time = get_curtime();
+//   start();
+//   return 0;
+// }

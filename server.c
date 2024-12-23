@@ -1,3 +1,7 @@
+/**
+ * Example TCP server running on localhost. Handles clients
+ * serially and sends dummy HTTP response.
+ */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -54,8 +58,8 @@ int main(int argc, char **argv) {
 
     while ((cur_read = read(clientfd, buf, buf_sz)) > 0) {
         ssize_t cur_written = 0;
-        float sleeptime_s = ((float)rand() / (float)RAND_MAX) * 4;
-        sleep(sleeptime_s);
+        //float sleeptime_s = ((float)rand() / (float)RAND_MAX) * 4;
+        //sleep(sleeptime_s);
         cur_written = write(clientfd, response, sizeof(response));
         if (cur_written < 0 ) {
           perror_and_exit("send");
