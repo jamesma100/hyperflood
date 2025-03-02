@@ -18,7 +18,7 @@
 #define BUF_SZ 4096
 
 static int total_sent = 0;
-static struct timespec start_time;
+static struct timespec start_time, end_time;
 
 void send_request(int sockfd, char request[], size_t sz) {
   size_t cur_written = write(sockfd, request, sz);
@@ -43,6 +43,7 @@ typedef struct {
   int portnum;
   int num_threads;
   float rps;
+  float dur;
 } Args;
 
 Args parse_args(int argc, char **argv) {
@@ -53,6 +54,7 @@ Args parse_args(int argc, char **argv) {
   int portnum = atoi(argv[2]);
   int num_threads = 1;
   float rps = 5;
+  float dur = 10;
   size_t i = 3;
   while (i < argc) {
     if (strcmp(argv[i], "-t") == 0) {
@@ -69,10 +71,23 @@ Args parse_args(int argc, char **argv) {
       } else {
         rps = atoi(argv[i+1]);
       }
+    } else if (strcmp(argv[i], "-d") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "missing argument for -d\n");
+        exit(1);
+      } else {
+        dur = atoi(argv[i+1]);
+      }
     }
     ++i;
   }
-  return (Args){.hostname=hostname, .portnum=portnum, .num_threads=num_threads, .rps=rps};
+  return (Args){
+    .hostname=hostname,
+    .portnum=portnum,
+    .num_threads=num_threads,
+    .rps=rps,
+    .dur=dur,
+  };
 }
 
 void print_stats(float rps) {
@@ -105,43 +120,39 @@ int main(int argc, char **argv) {
   // define dummy request
   char request[] = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
   start_time = get_curtime();
+  int num_req = 0;
 
-  struct timespec next_time;
+  struct timespec next_time, cur_time;
   while (1) {
+    cur_time = get_curtime();
+    if (time_diff_ms(&start_time, &cur_time)  > args.dur*1000) {
+      break;
+    }
     while (total_sent < get_expected_cnt(&start_time, args.rps)) {
-      printf("behind schedule |   ");
-      print_stats(args.rps);
+      // printf("behind schedule |   ");
+      // print_stats(args.rps);
       next_time = get_next(&start_time, total_sent, args.rps);
       send_request(sockfd, request, sizeof(request));
       read_response(sockfd);
+      ++num_req;
     }
-    printf("on schedule     |   ");
-    print_stats(args.rps);
+    // printf("on schedule     |   ");
+    // print_stats(args.rps);
     next_time = get_next(&start_time, total_sent, args.rps);
     sleep_until(&next_time);
     send_request(sockfd, request, sizeof(request));
     read_response(sockfd);
+    ++num_req;
   }
-  sleep(100);
+  end_time = get_curtime();
   // struct timespec start, end, total_start, total_end;
 
-  // long long duration_ms, duration_ms_total; 
-  // long double duration_s_total;
-
-  // clock_gettime(CLOCK_MONOTONIC_RAW, &total_start);
-
-  // for (int i = 0; i < NUM_REQUESTS; ++i) {
-  //   clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-  //   send_request(sockfd, request, sizeof(request));
-  //   printf("Sent: request %d, ", i+1);
-  //   read_response(sockfd);
-  //   clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-  //   duration_ms = (end.tv_nsec - start.tv_nsec) / 1000000LL + (end.tv_sec  - start.tv_sec) * 1000LL;
-  //   printf("took: %lld ms\n", duration_ms);
-  // }
-  // clock_gettime(CLOCK_MONOTONIC_RAW, &total_end);
-  // printf("Summary:\n");
-  // duration_ms_total = (total_end.tv_nsec - total_start.tv_nsec) / 1000000LL + (total_end.tv_sec  - total_start.tv_sec) * 1000LL;
-  // duration_s_total = (long double)NUM_REQUESTS / (duration_ms_total / 1000L);
-  // printf("Throughput: %Lf requests/sec\n", duration_s_total); 
+  long long duration_ms;
+  long double rps;
+  printf("Summary:\n");
+  duration_ms = (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL + (end_time.tv_sec  - start_time.tv_sec) * 1000LL;
+  rps = (long double)num_req / (duration_ms / 1000L);
+  printf("Total request count: %d\n", num_req);
+  printf("Total duration: %lld sec\n", duration_ms/1000L);
+  printf("Throughput: %Lf requests/sec\n", rps);
 }

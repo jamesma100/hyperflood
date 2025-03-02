@@ -38,6 +38,12 @@ long get_expected_cnt(struct timespec *start_time, float rps) {
   return max(0, (long)(elapsed_s * rps)-1);
 }
 
+long long time_diff_ms(struct timespec *start_time, struct timespec *end_time) {
+  long long diff_ns_in_ms = (end_time->tv_nsec - start_time->tv_nsec) / 1000000LL;
+  long long diff_s_in_ms = (end_time->tv_sec  - start_time->tv_sec) * 1000LL;
+  return diff_ns_in_ms + diff_s_in_ms;
+}
+
 
 void sleep_until(struct timespec* endtime) {
   struct timespec curtime = get_curtime();
